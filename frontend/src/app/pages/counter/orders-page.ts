@@ -44,14 +44,14 @@ const toServe = (o: Order) => o.status !== 'CANCELLED' && !o.servedAt;
         <div class="card-head">
           <div class="seg" role="tablist">
             @for (f of filters; track f.id) {
-              <button role="tab" [class.on]="filter() === f.id" (click)="filter.set(f.id)">
+              <button role="tab" [class.on]="filter() === f.id" (click)="filter.set(f.id); limit.set(PAGE)">
                 {{ f.label }} @if (countOf(f.id)) { <span class="muted">{{ countOf(f.id) }}</span> }
               </button>
             }
           </div>
         </div>
 
-        @for (o of shown(); track o.id) {
+        @for (o of visible(); track o.id) {
           <div class="bill" [class.open]="open() === o.id" [class.served]="o.servedAt">
             <div class="line">
             @if (o.status !== 'CANCELLED') {
@@ -98,6 +98,11 @@ const toServe = (o: Order) => o.status !== 'CANCELLED' && !o.servedAt;
         } @empty {
           <div class="empty"><span class="ico">🧾</span><span>{{ loading() ? 'Loading…' : 'No bills here.' }}</span></div>
         }
+        @if (shown().length > limit()) {
+          <button class="block more" (click)="limit.set(limit() + PAGE)">
+            Show more ({{ shown().length - limit() }} older)
+          </button>
+        }
       </div>
     </div>
 
@@ -132,6 +137,7 @@ const toServe = (o: Order) => o.status !== 'CANCELLED' && !o.servedAt;
     .r { display: flex; justify-content: space-between; font-size: .9rem; }
     .disc { color: var(--ok); }
     .seg { overflow-x: auto; max-width: 100%; }
+    .more { margin-top: 10px; }
     @media (max-width: 560px) {
       .bill-row { grid-template-columns: 1fr auto; }
       .no { display: none; }
@@ -169,6 +175,11 @@ export class OrdersPage implements OnInit, OnDestroy {
     return this.orders().filter((o) => o.status === f);
   });
 
+  /** Rows rendered at once: a busy night has 400+ bills, too many to build in one go on a phone. */
+  readonly PAGE = 50;
+  limit = signal(this.PAGE);
+  visible = computed(() => this.shown().slice(0, this.limit()));
+
   private timer?: ReturnType<typeof setInterval>;
   private firstLoad = true;
 
@@ -185,7 +196,7 @@ export class OrdersPage implements OnInit, OnDestroy {
     this.api.orders(this.date(), true).subscribe({ next: (o) => this.orders.set(o), error: () => {} });
   }
 
-  setDate(d: string) { if (d) { this.date.set(d); this.load(); } }
+  setDate(d: string) { if (d) { this.date.set(d); this.limit.set(this.PAGE); this.load(); } }
 
   load() {
     this.loading.set(true);

@@ -20,10 +20,11 @@ export class ApiService {
   createCombo(b: Partial<Combo>) { return this.http.post<Combo>('/api/combos', b); }
   updateCombo(id: number, b: Partial<Combo>) { return this.http.put<Combo>(`/api/combos/${id}`, b); }
 
-  upload(file: File) {
+  /** The server shrinks photos to WebP; 'qr' keeps the image lossless so it always scans. */
+  upload(file: File, kind: 'photo' | 'qr' = 'photo') {
     const fd = new FormData();
     fd.append('file', file);
-    return this.http.post<{ id: number; url: string }>('/api/uploads', fd);
+    return this.http.post<{ id: number; url: string }>('/api/uploads', fd, { params: { kind } });
   }
 
   settings() { return this.http.get<Settings>('/api/settings'); }

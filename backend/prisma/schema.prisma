@@ -155,8 +155,9 @@ model Order {
   lines         OrderLine[]
   offers        OrderOffer[]
 
-  @@index([businessDate])
+  @@index([businessDate, status])
   @@index([status])
+  @@index([customerId])
 }
 
 model OrderLine {
@@ -173,6 +174,8 @@ model OrderLine {
   qty           Int
   lineDiscount  Int     @default(0)
   lineTotal     Int
+
+  @@index([orderId])
 }
 
 model OrderOffer {
@@ -182,6 +185,9 @@ model OrderOffer {
   offerId        Int
   offer          Offer  @relation(fields: [offerId], references: [id])
   discountAmount Int
+
+  @@index([orderId])
+  @@index([offerId])
 }
 
 model StockMovement {
@@ -192,6 +198,8 @@ model StockMovement {
   reason    StockReason
   orderId   Int?
   createdAt DateTime    @default(now())
+
+  @@index([itemId])
 }
 
 model Setting {

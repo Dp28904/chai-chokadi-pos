@@ -19,7 +19,8 @@
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "build:web": "cd ../frontend && npx ng build && rm -rf ../backend/public && cp -R dist/frontend/browser ../backend/public",
-    "seed:menu": "ts-node prisma/seed-menu.ts"
+    "seed:menu": "ts-node prisma/seed-menu.ts",
+    "test:db": "TEST_DATABASE_URL=${TEST_DATABASE_URL:-postgresql://stall:stall@localhost:5432/stall_test} jest"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",
@@ -40,7 +41,8 @@
     "passport-jwt": "^4.0.1",
     "prisma": "^6.19.3",
     "reflect-metadata": "^0.2.2",
-    "rxjs": "^7.8.1"
+    "rxjs": "^7.8.1",
+    "sharp": "^0.34.5"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.2.0",

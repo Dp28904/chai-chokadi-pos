@@ -1,4 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
+import { CatalogCache } from '../catalog/catalog-cache.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { expandLine } from '../pricing/expand';
 import { PricingService } from '../pricing/pricing.service';
@@ -14,10 +16,15 @@ export function businessDateOf(now = new Date()): Date {
   return new Date(shifted.toISOString().slice(0, 10) + 'T00:00:00Z');
 }
 
+/** What the Bills page shows: no ids or offer rows it never reads. */
 const include = {
-  lines: true,
-  offers: true,
-  customer: true,
+  lines: { select: { nameSnapshot: true, qty: true, unitPrice: true } },
+  customer: { select: { name: true, phone: true } },
+  servedBy: { select: { name: true } },
+} as const;
+/** After create/pay/served the client only needs the bill header. */
+const slim = {
+  customer: { select: { name: true, phone: true } },
   servedBy: { select: { name: true } },
 } as const;
 
@@ -26,6 +33,7 @@ export class OrdersService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly pricing: PricingService,
+    private readonly catalog: CatalogCache,
   ) {}
 
   preview(lines: CreateOrderDto['lines']) {
@@ -35,7 +43,10 @@ export class OrdersService {
   async create(dto: CreateOrderDto, userId: number) {
     // A retried request (double tap, flaky network) returns the bill already made.
     if (dto.clientRef) {
-      const existing = await this.prisma.order.findUnique({ where: { clientRef: dto.clientRef }, include });
+      const existing = await this.prisma.order.findUnique({
+        where: { clientRef: dto.clientRef },
+        include: slim,
+      });
       if (existing) return existing;
     }
     const priced = await this.pricing.calculate(dto.lines);
@@ -54,44 +65,60 @@ export class OrdersService {
           discountTotal: priced.discountTotal,
           grandTotal: priced.grandTotal,
           businessDate: businessDateOf(),
-          lines: { create: priced.lines },
+          // one INSERT for all lines/offers instead of one per row
+          lines: { createMany: { data: priced.lines } },
           offers: {
-            create: priced.offers.map((o) => ({ offerId: o.offerId, discountAmount: o.discountAmount })),
+            createMany: {
+              data: priced.offers.map((o) => ({ offerId: o.offerId, discountAmount: o.discountAmount })),
+            },
           },
         },
-        include,
+        include: slim,
       });
     });
   }
 
   async pay(id: number, method: 'CASH' | 'ONLINE') {
+    const catalog = await this.catalog.get();
     return this.prisma.$transaction(async (tx) => {
-      const order = await tx.order.findUnique({ where: { id }, include: { lines: true } });
-      if (!order) throw new NotFoundException('Order not found');
-      if (order.status !== 'PENDING') throw new BadRequestException(`Order is already ${order.status}`);
-
-      // Expand combo lines into the items they contain, then count per item.
-      const comboIds = order.lines.filter((l) => l.comboId).map((l) => l.comboId!);
-      const parts = await tx.comboItem.findMany({ where: { comboId: { in: comboIds } } });
-      const used = new Map<number, number>();
-      for (const l of order.lines) {
-        for (const [itemId, qty] of expandLine(l, parts)) used.set(itemId, (used.get(itemId) ?? 0) + qty);
-      }
-      const tracked = await tx.item.findMany({
-        where: { id: { in: [...used.keys()] }, trackStock: true },
-        select: { id: true },
-      });
-      for (const { id: itemId } of tracked) {
-        const qty = used.get(itemId)!;
-        await tx.item.update({ where: { id: itemId }, data: { qtyOnHand: { decrement: qty } } });
-        await tx.stockMovement.create({ data: { itemId, change: -qty, reason: 'SALE', orderId: id } });
-      }
-
-      return tx.order.update({
-        where: { id },
+      // Conditional update: if two devices confirm the same bill at once, only one
+      // wins, so stock is never deducted twice.
+      const won = await tx.order.updateMany({
+        where: { id, status: 'PENDING' },
         data: { status: 'PAID', paymentMethod: method, paidAt: new Date() },
-        include,
       });
+      if (won.count === 0) {
+        const order = await tx.order.findUnique({ where: { id }, select: { status: true } });
+        if (!order) throw new NotFoundException('Order not found');
+        throw new BadRequestException(`Order is already ${order.status}`);
+      }
+
+      // Expand combo lines into the items they contain, then count per tracked item.
+      const lines = await tx.orderLine.findMany({
+        where: { orderId: id },
+        select: { itemId: true, comboId: true, qty: true, choiceItemIds: true },
+      });
+      const used = new Map<number, number>();
+      for (const l of lines) {
+        for (const [itemId, qty] of expandLine(l, catalog.comboParts)) {
+          if (catalog.items.get(itemId)?.trackStock) used.set(itemId, (used.get(itemId) ?? 0) + qty);
+        }
+      }
+      if (used.size) {
+        const rows = [...used].map(([itemId, qty]) => Prisma.sql`(${itemId}::int, ${qty}::int)`);
+        await tx.$executeRaw`
+          UPDATE "Item" AS i SET "qtyOnHand" = i."qtyOnHand" - v.qty
+          FROM (VALUES ${Prisma.join(rows)}) AS v(id, qty) WHERE i.id = v.id`;
+        await tx.stockMovement.createMany({
+          data: [...used].map(([itemId, qty]) => ({
+            itemId,
+            change: -qty,
+            reason: 'SALE' as const,
+            orderId: id,
+          })),
+        });
+      }
+      return tx.order.findUniqueOrThrow({ where: { id }, include: slim });
     });
   }
 
@@ -101,7 +128,7 @@ export class OrdersService {
     if (order.status !== 'PENDING') throw new BadRequestException(`Order is already ${order.status}`);
     // Food already handed over is a real sale; cancelling it would hide it.
     if (order.servedAt) throw new BadRequestException('This order was already served');
-    return this.prisma.order.update({ where: { id }, data: { status: 'CANCELLED' }, include });
+    return this.prisma.order.update({ where: { id }, data: { status: 'CANCELLED' }, include: slim });
   }
 
   /** Tick (or untick, to undo a mis-tap) "served" on a paid or pending bill. */
@@ -112,16 +139,28 @@ export class OrdersService {
     return this.prisma.order.update({
       where: { id },
       data: served ? { servedAt: new Date(), servedById: userId } : { servedAt: null, servedById: null },
-      include,
+      include: slim,
     });
   }
 
   list(date?: string) {
     if (date && !/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new BadRequestException('Date must be YYYY-MM-DD');
     const day = date ? new Date(`${date}T00:00:00Z`) : businessDateOf();
+    // Polled every 20 s by each device: send only what the Bills page shows.
     return this.prisma.order.findMany({
       where: { businessDate: day },
-      include,
+      select: {
+        id: true,
+        billNo: true,
+        subtotal: true,
+        discountTotal: true,
+        grandTotal: true,
+        status: true,
+        paymentMethod: true,
+        createdAt: true,
+        servedAt: true,
+        ...include,
+      },
       orderBy: { id: 'desc' },
     });
   }

@@ -14,6 +14,7 @@ import { IsBoolean, IsOptional, IsString, Matches, MaxLength, MinLength } from '
 import { hashPassword } from '../auth/auth.service';
 import type { AuthUser } from '../auth/jwt.strategy';
 import { JwtAuthGuard, Roles, RolesGuard } from '../auth/roles';
+import { SessionCache } from '../auth/session-cache.service';
 import { PrismaService } from '../prisma/prisma.service';
 
 class CreateCounterUserDto {
@@ -43,7 +44,10 @@ const select = { id: true, name: true, username: true, role: true, isActive: tru
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles('ADMIN')
 export class UsersController {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly sessions: SessionCache,
+  ) {}
 
   @Get()
   list() {
@@ -72,7 +76,7 @@ export class UsersController {
     if (dto.isActive === false && id === req.user.id) {
       throw new BadRequestException('You cannot disable your own account');
     }
-    return this.prisma.user.update({
+    const user = await this.prisma.user.update({
       where: { id },
       data: {
         name: dto.name?.trim(),
@@ -81,5 +85,7 @@ export class UsersController {
       },
       select,
     });
+    this.sessions.invalidate(id); // a disabled user is locked out on their next request
+    return user;
   }
 }

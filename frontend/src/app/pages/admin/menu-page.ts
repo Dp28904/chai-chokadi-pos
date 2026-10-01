@@ -69,7 +69,7 @@ const blankCombo = (): ComboForm => ({
               @for (i of shownItems(); track i.id) {
                 <article class="prod" [class.off]="!i.isActive">
                   <div class="pic">
-                    @if (i.imageUrl) { <img [src]="i.imageUrl" alt="" loading="lazy" /> } @else { <span class="noimg">No photo</span> }
+                    @if (i.imageUrl) { <img [src]="i.imageUrl" alt="" loading="lazy" decoding="async" /> } @else { <span class="noimg">No photo</span> }
                     <div class="flags">
                       @if (!i.isActive) { <span class="badge">Hidden</span> }
                       @if (i.isFavourite) { <span class="badge gold">⭐ Favourite</span> }
@@ -98,7 +98,7 @@ const blankCombo = (): ComboForm => ({
             @for (c of combos(); track c.id) {
               <article class="prod" [class.off]="!c.isActive">
                 <div class="pic">
-                  @if (c.imageUrl) { <img [src]="c.imageUrl" alt="" loading="lazy" /> } @else { <span class="noimg">No photo</span> }
+                  @if (c.imageUrl) { <img [src]="c.imageUrl" alt="" loading="lazy" decoding="async" /> } @else { <span class="noimg">No photo</span> }
                   <div class="flags">
                     @if (!c.isActive) { <span class="badge">Hidden</span> }
                     @if (c.choiceCategoryId) { <span class="badge brand">Customer picks</span> }
@@ -156,7 +156,7 @@ const blankCombo = (): ComboForm => ({
             <button type="button" class="ghost icon" (click)="itemForm.set(null)" aria-label="Close">✕</button></div>
           <div class="photo-row">
             <div class="photo">@if (f.imageUrl) { <img [src]="f.imageUrl" alt="" /> } @else { <span class="noimg">No photo</span> }</div>
-            <label class="field">Photo <span class="hint">PNG, JPEG or WebP, up to 2 MB</span>
+            <label class="field">Photo <span class="hint">PNG, JPEG or WebP, up to 8 MB (resized automatically)</span>
               <input type="file" accept="image/png,image/jpeg,image/webp" (change)="upload($event, f)" />
             </label>
           </div>
@@ -360,7 +360,7 @@ export class MenuPage implements OnInit {
     const input = ev.target as HTMLInputElement;
     const file = input.files?.[0];
     if (!file) return;
-    if (file.size > 2 * 1024 * 1024) { this.toast.error('Photo is larger than 2 MB'); input.value = ''; return; }
+    if (file.size > 8 * 1024 * 1024) { this.toast.error('Photo is larger than 8 MB'); input.value = ''; return; }
     this.api.upload(file).subscribe((r) => (f.imageUrl = r.url));
   }
 

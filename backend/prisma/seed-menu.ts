@@ -4,13 +4,15 @@
 import { PrismaClient } from '@prisma/client';
 import { readFileSync } from 'fs';
 import { join } from 'path';
+import { optimiseImage } from '../src/uploads/image';
 
 const prisma = new PrismaClient();
 const rs = (rupees: number) => rupees * 100;
 
 async function photo(file: string) {
-  const data = readFileSync(join(__dirname, 'menu-images', file));
-  const row = await prisma.upload.create({ data: { mime: 'image/jpeg', data: new Uint8Array(data) } });
+  // Same optimisation as uploads through the app (small WebP).
+  const img = await optimiseImage(readFileSync(join(__dirname, 'menu-images', file)), 'photo');
+  const row = await prisma.upload.create({ data: { mime: img.mime, data: new Uint8Array(img.data) } });
   return `/api/uploads/${row.id}`;
 }
 

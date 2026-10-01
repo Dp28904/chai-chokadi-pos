@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
+import { CatalogCache } from '../catalog/catalog-cache.service';
 import { applyOffers, EngineLine } from './offers.engine';
 
 export interface CartLineInput {
@@ -46,45 +46,46 @@ export function totalsFor(lines: PricedLine[], offers: AppliedOffer[]): PricedCa
 
 @Injectable()
 export class PricingService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly catalog: CatalogCache) {}
 
   async calculate(cart: CartLineInput[]): Promise<PricedCart> {
     if (!cart.length) throw new BadRequestException('Cart is empty');
 
-    const itemIds = [
-      ...cart.filter((l) => l.itemId).map((l) => l.itemId!),
-      ...cart.flatMap((l) => l.choiceItemIds ?? []),
-    ];
-    const comboIds = cart.filter((l) => l.comboId).map((l) => l.comboId!);
-    const [items, combos] = await Promise.all([
-      this.prisma.item.findMany({ where: { id: { in: itemIds }, isActive: true } }),
-      this.prisma.combo.findMany({ where: { id: { in: comboIds }, isActive: true } }),
-    ]);
+    const catalog = await this.catalog.get();
+    const item = (id: number) => {
+      const i = catalog.items.get(id);
+      return i?.isActive ? i : undefined;
+    };
+    const comboById = (id: number) => {
+      const c = catalog.combos.get(id);
+      return c?.isActive ? c : undefined;
+    };
 
     const lines: PricedLine[] = cart.map((l) => {
       if (!!l.itemId === !!l.comboId) {
         throw new BadRequestException('Each cart line needs exactly one of itemId or comboId');
       }
       if (l.itemId) {
-        const item = items.find((i) => i.id === l.itemId);
-        if (!item) throw new BadRequestException('An item in the cart is unavailable');
+        const it = item(l.itemId);
+        if (!it) throw new BadRequestException('An item in the cart is unavailable');
         return {
-          itemId: item.id,
-          nameSnapshot: item.name,
-          unitPrice: item.price,
+          itemId: it.id,
+          nameSnapshot: it.name,
+          unitPrice: it.price,
           qty: l.qty,
           lineDiscount: 0,
-          lineTotal: item.price * l.qty,
+          lineTotal: it.price * l.qty,
         };
       }
-      const combo = combos.find((c) => c.id === l.comboId);
+      const combo = comboById(l.comboId!);
       if (!combo) throw new BadRequestException('A combo in the cart is unavailable');
       const picks = l.choiceItemIds ?? [];
       let nameSnapshot = combo.name;
       if (combo.choiceCategoryId) {
-        const picked = picks.map((id) =>
-          items.find((i) => i.id === id && i.categoryId === combo.choiceCategoryId),
-        );
+        const picked = picks.map((id) => {
+          const i = item(id);
+          return i?.categoryId === combo.choiceCategoryId ? i : undefined;
+        });
         if (picks.length !== combo.choiceQty || picked.some((i) => !i)) {
           throw new BadRequestException(`${combo.name}: pick ${combo.choiceQty} items from the menu`);
         }
@@ -105,9 +106,8 @@ export class PricingService {
 
     const entries: EngineLine[] = lines.map((line) => ({
       line,
-      categoryId: line.itemId ? items.find((i) => i.id === line.itemId)?.categoryId : undefined,
+      categoryId: line.itemId ? item(line.itemId)?.categoryId : undefined,
     }));
-    const offers = await this.prisma.offer.findMany({ where: { isActive: true } });
-    return totalsFor(lines, applyOffers(entries, offers));
+    return totalsFor(lines, applyOffers(entries, catalog.offers));
   }
 }

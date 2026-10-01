@@ -1,3 +1,4 @@
+import { InvalidateCatalog } from '../catalog/invalidate-catalog.interceptor';
 import {
   BadRequestException,
   Body,
@@ -9,6 +10,7 @@ import {
   Post,
   Put,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
 import { Transform } from 'class-transformer';
 import {
@@ -67,6 +69,7 @@ function validate(d: OfferDto) {
   }
 }
 
+@UseInterceptors(InvalidateCatalog)
 @Controller('offers')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class OffersController {

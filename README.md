@@ -182,4 +182,23 @@ This uses a separate local database; export CSVs from both if you switch mid-fes
 - Sessions last 16 hours; disabling a user takes effect on their next request.
 - Security headers via Helmet (CSP, HSTS, no framing); request bodies capped at 256 KB.
 - Admin-only endpoints are enforced on the server, not just hidden in the UI.
-- Uploaded images are stored in the database (free hosts have no persistent disk), max 2 MB, PNG/JPEG/WebP only.
+- Uploaded images are stored in the database (free hosts have no persistent disk): PNG/JPEG/WebP up to 8 MB,
+  re-encoded on arrival (photos → ≤720 px WebP, QR → lossless PNG) with metadata such as GPS stripped.
+
+## Performance notes
+
+Measured with 5,250 bills (15 nights × 350) on a laptop, phone emulated at 4× slower CPU on 4G:
+
+| What | Result |
+| --- | --- |
+| Price check while building a cart | ~2 ms, **0 database queries** (menu + offers cached in memory, cleared on any edit) |
+| Create / pay / mark served | 3–5 ms, 7–9 queries (lines inserted in one go; stock updated in one statement) |
+| Bills list (busy night, ~400 bills) | ~19 ms, ~15 KB gzipped, refreshed every 20 s per device |
+| Dashboard, whole festival | ~13 ms (computed in SQL, not in memory) |
+| Counter scrolling / layout shift | 60 fps, CLS 0 (fonts preloaded) |
+
+- Each signed-in request reuses a 60 s account cache instead of re-reading the user; disabling a user clears it at once.
+- Bills renders 50 rows at a time ("Show more"), so a 400-bill night never freezes a phone.
+- Queries slower than 250 ms are logged as warnings (`SLOW_QUERY_MS` to change). `PRISMA_QUERY_LOG=1` logs every query when profiling.
+- Database tests for the dashboard SQL: `npm run test:db` (needs a throwaway database whose name contains "test").
+
