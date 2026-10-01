@@ -21,7 +21,7 @@ export class OrdersController {
 
   @Post('preview')
   preview(@Body() dto: PreviewDto) {
-    return this.orders.preview(dto.lines);
+    return this.orders.preview(dto.lines, dto.customerPhone);
   }
 
   @Post()

@@ -10,6 +10,11 @@ const offer = (p: Partial<OfferRule>): OfferRule => ({
   minBillAmount: 0,
   minQty: 0,
   maxDiscount: null,
+  excludeCombos: false,
+  exclusive: false,
+  loyaltyStep: 0,
+  loyaltyMax: null,
+  loyaltyGapHours: 15,
   buyQty: null,
   getQty: null,
   startsAt: null,
@@ -108,11 +113,89 @@ describe('applyOffers', () => {
     expect(applyOffers([entry(1, 30000, 1)], [o])[0].discountAmount).toBe(1500);
   });
 
-  it('rounds percentage discounts to whole rupees', () => {
-    // 10% of Rs 145 = Rs 14.50 -> Rs 15 (nearest rupee)
+  it('rounds percentage discounts DOWN to whole rupees', () => {
     const o = offer({ id: 9, scope: 'BILL', targetId: null, value: 10 });
-    expect(applyOffers([entry(1, 14500, 1)], [o])[0].discountAmount).toBe(1500);
-    // 10% of Rs 144 = Rs 14.40 -> Rs 14
-    expect(applyOffers([entry(1, 14400, 1)], [o])[0].discountAmount).toBe(1400);
+    // 10% of Rs 145 = Rs 14.50 -> Rs 14
+    expect(applyOffers([entry(1, 14500, 1)], [o])[0].discountAmount).toBe(1400);
+    // 10% of Rs 149.90 = Rs 14.99 -> Rs 14
+    expect(applyOffers([entry(1, 14990, 1)], [o])[0].discountAmount).toBe(1400);
+    // exact amounts are untouched: 10% of Rs 150 = Rs 15
+    expect(applyOffers([entry(1, 15000, 1)], [o])[0].discountAmount).toBe(1500);
+    // the example: 15% of Rs 151.70 = Rs 22.755 -> Rs 22
+    const p15 = offer({ id: 9, scope: 'BILL', targetId: null, value: 15 });
+    expect(applyOffers([entry(1, 15170, 1)], [p15])[0].discountAmount).toBe(2200);
+  });
+
+  describe('Make Your Own Combo (exclusive, items only, min Rs 150, 5% up to Rs 50)', () => {
+    const myoc = offer({
+      id: 7,
+      name: 'MYOC',
+      scope: 'BILL',
+      targetId: null,
+      value: 5,
+      minBillAmount: 15000,
+      maxDiscount: 5000,
+      excludeCombos: true,
+      exclusive: true,
+      loyaltyStep: 5,
+      loyaltyMax: 20,
+    });
+    const maska = offer({
+      id: 3,
+      name: 'Maska',
+      scope: 'CATEGORY',
+      targetId: 10,
+      value: 10,
+      minQty: 2,
+      maxDiscount: 500,
+    });
+    const combo = (price: number): EngineLine => ({
+      line: {
+        comboId: 5,
+        nameSnapshot: 'Combo',
+        unitPrice: price,
+        qty: 1,
+        lineDiscount: 0,
+        lineTotal: price,
+      },
+    });
+
+    it('needs Rs 150 of items picked separately; combos do not count', () => {
+      expect(applyOffers([entry(1, 10000, 1), combo(8500)], [myoc])).toEqual([]);
+      expect(applyOffers([combo(8500), combo(9500)], [myoc])).toEqual([]);
+    });
+
+    it('5% of the items, shown with its level', () => {
+      // items Rs 160 -> 5% = Rs 8; the combo stays full price
+      const r = applyOffers([entry(1, 8000, 1), entry(2, 8000, 1), combo(8500)], [myoc]);
+      expect(r).toEqual([{ offerId: 7, name: 'MYOC (5%)', discountAmount: 800 }]);
+    });
+
+    it('replaces every other offer when it applies (no maska discount on top)', () => {
+      // two maska buns (Rs 90) + Rs 70 other items = Rs 160 of items
+      const e = [entry(1, 4000, 1, 10), entry(2, 5000, 1, 10), entry(3, 7000, 1, 11)];
+      const r = applyOffers(e, [maska, myoc]);
+      expect(r).toEqual([{ offerId: 7, name: 'MYOC (5%)', discountAmount: 800 }]);
+      expect(e.every((x) => x.line.lineDiscount === 0)).toBe(true);
+    });
+
+    it('below Rs 150 the other offers still apply as usual', () => {
+      const r = applyOffers([entry(1, 4000, 1, 10), entry(2, 5000, 1, 10)], [maska, myoc]);
+      expect(r).toEqual([{ offerId: 3, name: 'Maska', discountAmount: 500 }]);
+    });
+
+    it('uses the repeat-customer percent and caps at Rs 50', () => {
+      const pct20 = () => 20;
+      expect(applyOffers([entry(1, 20000, 1)], [myoc], new Date(), pct20)).toEqual([
+        { offerId: 7, name: 'MYOC (20%)', discountAmount: 4000 },
+      ]);
+      expect(applyOffers([entry(1, 50000, 1)], [myoc], new Date(), pct20)[0].discountAmount).toBe(5000);
+    });
+
+    it('a normal (non-exclusive) bill offer still counts combos and stacks', () => {
+      const plain = offer({ id: 8, scope: 'BILL', targetId: null, value: 10, minBillAmount: 10000 });
+      // 10% of Rs 145 = Rs 14.50 -> Rs 14 (rounded down)
+      expect(applyOffers([entry(1, 6000, 1), combo(8500)], [plain])[0].discountAmount).toBe(1400);
+    });
   });
 });

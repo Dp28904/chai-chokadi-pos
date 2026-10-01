@@ -36,8 +36,8 @@ export class OrdersService {
     private readonly catalog: CatalogCache,
   ) {}
 
-  preview(lines: CreateOrderDto['lines']) {
-    return this.pricing.calculate(lines);
+  preview(lines: CreateOrderDto['lines'], phone?: string) {
+    return this.pricing.calculate(lines, phone);
   }
 
   async create(dto: CreateOrderDto, userId: number) {
@@ -49,7 +49,7 @@ export class OrdersService {
       });
       if (existing) return existing;
     }
-    const priced = await this.pricing.calculate(dto.lines);
+    const priced = await this.pricing.calculate(dto.lines, dto.phone);
     return this.prisma.$transaction(async (tx) => {
       const customer = await tx.customer.upsert({
         where: { phone: dto.phone },

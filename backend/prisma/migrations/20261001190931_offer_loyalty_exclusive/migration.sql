@@ -1,0 +1,6 @@
+-- AlterTable
+ALTER TABLE "Offer" ADD COLUMN     "exclusive" BOOLEAN NOT NULL DEFAULT false,
+ADD COLUMN     "loyaltyGapHours" INTEGER NOT NULL DEFAULT 15,
+ADD COLUMN     "loyaltyMax" INTEGER,
+ADD COLUMN     "loyaltyStep" INTEGER NOT NULL DEFAULT 0;
+
