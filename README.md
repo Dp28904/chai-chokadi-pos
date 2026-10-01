@@ -20,7 +20,7 @@ Payments are not processed by the app. Online payments use your own UPI QR; staf
 | --- | --- |
 | Counter | Home (welcome, ⭐ Chokadi Favourites, numbered combos, offer banners), photo menu by category, search, combos (fixed or "pick any N"), live cart total with offers applied; phones get a bottom nav and a "View cart" button |
 | Checkout | Customer name + mobile (returning customers autofill) → bill → Cash (change calculator) or Online (your QR) |
-| Bills | Any day's bills, pending/paid/cancelled, take payment later or cancel |
+| Bills | Any day's bills; a **To serve** queue with a tick per bill (paid or pending) to confirm it was handed over, who served it and when; take payment later or cancel; refreshes every 20 s so all devices stay in sync |
 | Offers | % off, flat ₹ off, buy X get Y; per item, category or whole bill; min quantity, min bill, "upto ₹" cap, start/end time |
 | Stock | Add / waste / count per item, low-stock alerts, "prepare for tomorrow" forecast from recent sales |
 | Dashboard | Sales per day (cash vs online), busiest hours, top/slow sellers, categories, offer impact, customers, CSV export |
@@ -141,6 +141,8 @@ This keeps both the app and the database warm. Also open the app 10 minutes befo
 ## During the festival
 
 - **Every night**: Dashboard → **Download bills (CSV)**. It's your offline backup.
+- **Serving**: tick each bill in **Bills → To serve** as it's handed over (or tap **Served now** after payment).
+  Served bills can't be cancelled.
 - **Pending bills**: before closing, open **Bills** and settle or cancel anything pending
   (pending bills are not counted in sales).
 - **Prepare for tomorrow**: Stock page, choose Normal / Busy / Peak.
