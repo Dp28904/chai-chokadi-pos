@@ -14,7 +14,12 @@ export function businessDateOf(now = new Date()): Date {
   return new Date(shifted.toISOString().slice(0, 10) + 'T00:00:00Z');
 }
 
-const include = { lines: true, offers: true, customer: true } as const;
+const include = {
+  lines: true,
+  offers: true,
+  customer: true,
+  servedBy: { select: { name: true } },
+} as const;
 
 @Injectable()
 export class OrdersService {
@@ -94,7 +99,21 @@ export class OrdersService {
     const order = await this.prisma.order.findUnique({ where: { id } });
     if (!order) throw new NotFoundException('Order not found');
     if (order.status !== 'PENDING') throw new BadRequestException(`Order is already ${order.status}`);
+    // Food already handed over is a real sale; cancelling it would hide it.
+    if (order.servedAt) throw new BadRequestException('This order was already served');
     return this.prisma.order.update({ where: { id }, data: { status: 'CANCELLED' }, include });
+  }
+
+  /** Tick (or untick, to undo a mis-tap) "served" on a paid or pending bill. */
+  async setServed(id: number, served: boolean, userId: number) {
+    const order = await this.prisma.order.findUnique({ where: { id } });
+    if (!order) throw new NotFoundException('Order not found');
+    if (order.status === 'CANCELLED') throw new BadRequestException("Cancelled bills can't be served");
+    return this.prisma.order.update({
+      where: { id },
+      data: served ? { servedAt: new Date(), servedById: userId } : { servedAt: null, servedById: null },
+      include,
+    });
   }
 
   list(date?: string) {

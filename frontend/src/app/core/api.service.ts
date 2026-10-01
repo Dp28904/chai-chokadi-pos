@@ -37,7 +37,11 @@ export class ApiService {
   }
   payOrder(id: number, method: 'CASH' | 'ONLINE') { return this.http.patch<Order>(`/api/orders/${id}/pay`, { method }); }
   cancelOrder(id: number) { return this.http.patch<Order>(`/api/orders/${id}/cancel`, {}); }
-  orders(date?: string) { return this.http.get<Order[]>('/api/orders', { params: date ? { date } : {} }); }
+  setServed(id: number, served: boolean) { return this.http.patch<Order>(`/api/orders/${id}/served`, { served }); }
+  /** silent: background refreshes shouldn't toast every time the network blips. */
+  orders(date?: string, silent = false) {
+    return this.http.get<Order[]>('/api/orders', { params: date ? { date } : {}, ...(silent ? { context: SILENT() } : {}) });
+  }
   customerByPhone(phone: string) {
     return this.http.get<{ name: string } | null>(`/api/customers/by-phone/${phone}`, { context: SILENT() });
   }

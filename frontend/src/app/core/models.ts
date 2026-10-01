@@ -26,6 +26,7 @@ export interface Order {
   id: number; billNo: number; subtotal: number; discountTotal: number; grandTotal: number;
   status: 'PENDING' | 'PAID' | 'CANCELLED'; paymentMethod: 'CASH' | 'ONLINE' | null;
   createdAt: string; customer: { name: string; phone: string };
+  servedAt: string | null; servedBy: { name: string } | null;
   lines: { nameSnapshot: string; qty: number; unitPrice: number; lineTotal: number }[];
   offers: { discountAmount: number }[];
 }

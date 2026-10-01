@@ -11,7 +11,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { JwtAuthGuard, RolesGuard } from '../auth/roles';
-import { CreateOrderDto, PayDto, PreviewDto } from './orders.dto';
+import { CreateOrderDto, PayDto, PreviewDto, ServedDto } from './orders.dto';
 import { OrdersService } from './orders.service';
 
 @Controller('orders')
@@ -37,6 +37,15 @@ export class OrdersController {
   @Patch(':id/cancel')
   cancel(@Param('id', ParseIntPipe) id: number) {
     return this.orders.cancel(id);
+  }
+
+  @Patch(':id/served')
+  served(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: ServedDto,
+    @Request() req: { user: { id: number } },
+  ) {
+    return this.orders.setServed(id, dto.served, req.user.id);
   }
 
   @Get()

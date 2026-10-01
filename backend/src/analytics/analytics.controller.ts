@@ -41,6 +41,7 @@ export class AnalyticsController {
       'Bill',
       'Business date',
       'Paid at (IST)',
+      'Served at (IST)',
       'Customer',
       'Phone',
       'Items',
@@ -51,13 +52,14 @@ export class AnalyticsController {
       'Payment',
     ];
     const rs = (p: number) => (p / 100).toFixed(2);
+    const ist = (d: Date | null) =>
+      d ? new Date(d.getTime() + 5.5 * 3600_000).toISOString().slice(0, 16).replace('T', ' ') : '';
     const lines = orders.map((o) =>
       [
         o.billNo,
         o.businessDate.toISOString().slice(0, 10),
-        o.paidAt
-          ? new Date(o.paidAt.getTime() + 5.5 * 3600_000).toISOString().slice(0, 16).replace('T', ' ')
-          : '',
+        ist(o.paidAt),
+        ist(o.servedAt),
         o.customer.name,
         o.customer.phone,
         o.lines.map((l) => `${l.qty}x ${l.nameSnapshot}`).join('; '),
