@@ -20,7 +20,7 @@
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "build:web": "cd ../frontend && npx ng build && rm -rf ../backend/public && cp -R dist/frontend/browser ../backend/public",
     "seed:menu": "ts-node prisma/seed-menu.ts",
-    "test:db": "TEST_DATABASE_URL=${TEST_DATABASE_URL:-postgresql://stall:stall@localhost:5432/stall_test} jest"
+    "test:db": "export TEST_DATABASE_URL=${TEST_DATABASE_URL:-postgresql://stall:stall@localhost:5432/stall_test} && DATABASE_URL=$TEST_DATABASE_URL prisma migrate deploy && jest"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",

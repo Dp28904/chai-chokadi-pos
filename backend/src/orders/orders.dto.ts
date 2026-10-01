@@ -29,6 +29,12 @@ export class PreviewDto {
   @ValidateNested({ each: true })
   @Type(() => CartLineDto)
   lines: CartLineDto[];
+
+  /** Known at checkout: lets repeat customers see their own-combo level on the bill. */
+  @IsOptional()
+  @Transform(({ value }) => String(value).replace(/\D/g, '').slice(-10))
+  @Matches(/^\d{10}$/, { message: 'Phone must be a 10-digit number' })
+  customerPhone?: string;
 }
 
 export class CreateOrderDto extends PreviewDto {

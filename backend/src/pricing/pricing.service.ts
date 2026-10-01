@@ -1,5 +1,8 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
+import type { Offer } from '@prisma/client';
 import { CatalogCache } from '../catalog/catalog-cache.service';
+import { PrismaService } from '../prisma/prisma.service';
+import { loyaltyPercent } from './loyalty';
 import { applyOffers, EngineLine } from './offers.engine';
 
 export interface CartLineInput {
@@ -46,9 +49,13 @@ export function totalsFor(lines: PricedLine[], offers: AppliedOffer[]): PricedCa
 
 @Injectable()
 export class PricingService {
-  constructor(private readonly catalog: CatalogCache) {}
+  constructor(
+    private readonly catalog: CatalogCache,
+    private readonly prisma: PrismaService,
+  ) {}
 
-  async calculate(cart: CartLineInput[]): Promise<PricedCart> {
+  /** phone: when known (checkout), repeat customers get their ladder level on offers that have one. */
+  async calculate(cart: CartLineInput[], phone?: string, now = new Date()): Promise<PricedCart> {
     if (!cart.length) throw new BadRequestException('Cart is empty');
 
     const catalog = await this.catalog.get();
@@ -108,6 +115,26 @@ export class PricingService {
       line,
       categoryId: line.itemId ? item(line.itemId)?.categoryId : undefined,
     }));
-    return totalsFor(lines, applyOffers(entries, catalog.offers));
+    const percents = await this.loyaltyPercents(catalog.offers, phone, now);
+    return totalsFor(
+      lines,
+      applyOffers(entries, catalog.offers, now, (o) => percents.get(o.id) ?? o.value),
+    );
+  }
+
+  /** One query, only when a phone is known and a ladder offer is running; cart previews stay query-free. */
+  private async loyaltyPercents(offers: Offer[], phone: string | undefined, now: Date) {
+    const ladder = offers.filter((o) => o.isActive && o.loyaltyStep > 0);
+    const result = new Map<number, number>();
+    if (!phone || !ladder.length) return result;
+    const past = await this.prisma.orderOffer.findMany({
+      where: { offerId: { in: ladder.map((o) => o.id) }, order: { status: 'PAID', customer: { phone } } },
+      select: { offerId: true, order: { select: { paidAt: true, createdAt: true } } },
+    });
+    for (const o of ladder) {
+      const history = past.filter((p) => p.offerId === o.id).map((p) => p.order.paidAt ?? p.order.createdAt);
+      result.set(o.id, loyaltyPercent(o, history, now));
+    }
+    return result;
   }
 }

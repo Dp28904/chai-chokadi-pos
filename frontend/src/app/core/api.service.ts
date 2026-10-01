@@ -30,8 +30,9 @@ export class ApiService {
   settings() { return this.http.get<Settings>('/api/settings'); }
   saveSettings(b: Partial<Settings>) { return this.http.put<Settings>('/api/settings', b); }
 
-  preview(lines: CartPayload, silent = false) {
-    return this.http.post<PricedCart>('/api/orders/preview', { lines }, silent ? { context: SILENT() } : {});
+  /** customerPhone (checkout): repeat customers see their own-combo level. */
+  preview(lines: CartPayload, silent = false, customerPhone?: string) {
+    return this.http.post<PricedCart>('/api/orders/preview', { lines, customerPhone }, silent ? { context: SILENT() } : {});
   }
   createOrder(b: { customerName: string; phone: string; clientRef: string; lines: { itemId?: number; comboId?: number; choiceItemIds?: number[]; qty: number }[] }) {
     return this.http.post<Order>('/api/orders', b);

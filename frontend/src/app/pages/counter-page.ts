@@ -461,8 +461,14 @@ export class CounterPage implements OnInit {
 
     if (o.scope === 'BILL') {
       return {
-        id: o.id, title: o.name, icon: '🛒', wide: true, images: [], target: null, badge: o.type === 'PERCENT_OFF' ? `${o.value}% OFF` : 'SAVE',
-        lead: o.minBillAmount ? `MINIMUM ORDER ${formatRupees(o.minBillAmount)}` : '', big: headline, sub: cap,
+        id: o.id, title: o.name, icon: '🛒', wide: true, images: [], target: null,
+        badge: o.type !== 'PERCENT_OFF' ? 'SAVE' : o.loyaltyStep ? `${o.value}–${o.loyaltyMax ?? 100}% OFF` : `${o.value}% OFF`,
+        lead: o.excludeCombos
+          ? `PICK ANY ITEMS WORTH ${formatRupees(o.minBillAmount)}+ (NOT COMBOS)`
+          : o.minBillAmount ? `MINIMUM ORDER ${formatRupees(o.minBillAmount)}` : '',
+        big: headline,
+        sub: [o.loyaltyStep ? `COME BACK FOR UP TO ${o.loyaltyMax ?? 100}% OFF` : '', o.maxDiscount ? `MAX ${formatRupees(o.maxDiscount)}` : '']
+          .filter(Boolean).join(' · '),
       };
     }
     const what = cat?.name ?? item?.name ?? 'items';

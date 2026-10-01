@@ -42,6 +42,7 @@ import { formatRupees } from '../../core/money';
           <div class="t disc"><span>{{ o.name }}</span><span class="money">−{{ money(o.discountAmount) }}</span></div>
         }
         <div class="t grand"><span>Total</span><span class="money">{{ money(total()) }}</span></div>
+        @if (hasLadder()) { <p class="hint">Repeat customers may get a bigger own-combo discount at checkout.</p> }
       </div>
       <button class="primary lg block" (click)="checkout.emit()">Checkout · {{ money(total()) }}</button>
     }
@@ -60,6 +61,7 @@ import { formatRupees } from '../../core/money';
     .t { display: flex; justify-content: space-between; gap: 12px; font-size: .92rem; }
     .disc { color: var(--ok); font-size: .85rem; }
     .grand { font-size: 1.3rem; font-weight: 700; margin-top: 2px; }
+    .hint { margin: 0; font-size: .78rem; color: var(--muted); }
   `],
 })
 export class CartPanel {
@@ -69,4 +71,6 @@ export class CartPanel {
 
   offers = computed(() => this.cart.priced()?.offers ?? []);
   total = computed(() => this.cart.priced()?.grandTotal ?? this.cart.subtotal());
+  /** Ladder offers are labelled with their level, e.g. "Make Your Own Combo (5%)". */
+  hasLadder = computed(() => this.offers().some((o) => /\(\d+%\)$/.test(o.name)));
 }

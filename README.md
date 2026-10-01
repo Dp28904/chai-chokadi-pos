@@ -31,6 +31,13 @@ Fonts (Poppins, Kaushan Script) are bundled with the app, so it looks the same o
 Choose which items appear under **Favourites** with the ⭐ checkbox in Menu → Edit item.
 Offer banners on the counter are generated from the active offers in Offers.
 
+**Make Your Own Combo** (Offers → edit to change): 5% off when a customer picks **₹150+ of individual items**
+(ready-made combos don't count and stay full price). It is **exclusive**: no other offer applies to that bill.
+Repeat customers (same mobile number) climb **5% → 10% → 15% → 20%**: a visit counts as a new one when it is
+at least **15 hours** after their last counted own-combo bill; bills closer together share a level. Only paid bills
+count, levels never reset, and the discount is capped at **₹50**. The cart shows 5%; the customer's level appears on
+the bill once their number is entered at checkout.
+
 Business rules worth knowing:
 
 - Money is stored in paise (integers). Percentage discounts round to whole rupees.

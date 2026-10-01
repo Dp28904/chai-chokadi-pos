@@ -240,7 +240,7 @@ export class Checkout implements OnInit {
     if (this.digits().length !== 10) { this.error.set('Enter a 10-digit mobile number'); return; }
     if (!this.name.trim()) { this.error.set('Enter the customer name'); return; }
     this.busy.set(true);
-    this.api.preview(this.cart.payload()).subscribe({
+    this.api.preview(this.cart.payload(), false, this.digits()).subscribe({
       next: (p) => { this.busy.set(false); this.priced.set(p); this.step.set('review'); },
       error: () => this.busy.set(false),
     });

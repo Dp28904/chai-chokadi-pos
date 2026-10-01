@@ -258,9 +258,16 @@ async function main() {
         name: 'Make Your Own Combo',
         type: 'PERCENT_OFF',
         scope: 'BILL',
-        value: 10,
-        minBillAmount: rs(100),
-        maxDiscount: rs(15),
+        // 5% on items picked separately (min Rs 150); repeat customers climb 5 -> 10 -> 15 -> 20%
+        // when they come back 15+ hours after their last visit. Replaces all other offers.
+        value: 5,
+        minBillAmount: rs(150),
+        excludeCombos: true,
+        exclusive: true,
+        loyaltyStep: 5,
+        loyaltyMax: 20,
+        loyaltyGapHours: 15,
+        maxDiscount: rs(50),
       },
     ],
   });

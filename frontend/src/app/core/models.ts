@@ -36,7 +36,8 @@ export type OfferType = 'PERCENT_OFF' | 'FLAT_OFF' | 'BUY_X_GET_Y';
 export type OfferScope = 'ITEM' | 'CATEGORY' | 'BILL';
 export interface Offer {
   id: number; name: string; type: OfferType; scope: OfferScope; targetId: number | null;
-  value: number; minBillAmount: number; minQty: number; maxDiscount: number | null; buyQty: number | null; getQty: number | null;
+  value: number; minBillAmount: number; minQty: number; maxDiscount: number | null; excludeCombos: boolean;
+  exclusive: boolean; loyaltyStep: number; loyaltyMax: number | null; loyaltyGapHours: number; buyQty: number | null; getQty: number | null;
   startsAt: string | null; endsAt: string | null; isActive: boolean;
 }
 

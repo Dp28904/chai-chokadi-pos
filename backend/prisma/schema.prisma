@@ -115,6 +115,12 @@ model Offer {
   minBillAmount  Int          @default(0)
   minQty         Int          @default(0) // units of matching items needed (ITEM/CATEGORY)
   maxDiscount    Int?         // cap in paise ("upto Rs 5")
+  excludeCombos  Boolean      @default(false) // BILL offers: only items bought separately count
+  exclusive      Boolean      @default(false) // BILL offers: when it applies, no other offer applies
+  // Repeat-customer ladder: +loyaltyStep % per visit (visits >= loyaltyGapHours apart), up to loyaltyMax %
+  loyaltyStep     Int         @default(0)
+  loyaltyMax      Int?
+  loyaltyGapHours Int         @default(15)
   buyQty         Int?
   getQty         Int?
   startsAt       DateTime?

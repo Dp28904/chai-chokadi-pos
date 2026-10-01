@@ -42,6 +42,11 @@ class OfferDto {
   @IsOptional() @IsInt() @Min(0) minBillAmount?: number;
   @IsOptional() @IsInt() @Min(0) minQty?: number;
   @IsOptional() @IsInt() @Min(1) maxDiscount?: number | null;
+  @IsOptional() @IsBoolean() excludeCombos?: boolean;
+  @IsOptional() @IsBoolean() exclusive?: boolean;
+  @IsOptional() @IsInt() @Min(0) @Max(100) loyaltyStep?: number;
+  @IsOptional() @IsInt() @Min(1) @Max(100) loyaltyMax?: number | null;
+  @IsOptional() @IsInt() @Min(1) @Max(168) loyaltyGapHours?: number;
   @IsOptional() @IsInt() @Min(1) buyQty?: number;
   @IsOptional() @IsInt() @Min(1) getQty?: number;
   // null/'' clears the date (a plain Date conversion would turn null into 1970).
@@ -51,6 +56,15 @@ class OfferDto {
 }
 
 function validate(d: OfferDto) {
+  if ((d.exclusive || d.loyaltyStep) && d.scope !== 'BILL') {
+    throw new BadRequestException('Exclusive and repeat-customer options are for whole-bill offers');
+  }
+  if (d.loyaltyStep && d.type !== 'PERCENT_OFF') {
+    throw new BadRequestException('Repeat-customer increases need a percent-off offer');
+  }
+  if (d.loyaltyStep && d.loyaltyMax != null && d.loyaltyMax < (d.value ?? 0)) {
+    throw new BadRequestException('The repeat-customer maximum must be at least the starting percent');
+  }
   if (d.scope !== 'BILL' && !d.targetId) throw new BadRequestException('Choose the item or category');
   if (d.scope === 'BILL' && d.type === 'BUY_X_GET_Y') {
     throw new BadRequestException('Buy X get Y cannot apply to the whole bill');
