@@ -77,8 +77,8 @@ export class SettingsPage implements OnInit {
     const file = input.files?.[0];
     input.value = '';
     if (!file) return;
-    if (file.size > 2 * 1024 * 1024) { this.toast.error('Image is larger than 2 MB'); return; }
-    this.api.upload(file).subscribe((r) => {
+    if (file.size > 8 * 1024 * 1024) { this.toast.error('Image is larger than 8 MB'); return; }
+    this.api.upload(file, 'qr').subscribe((r) => {
       this.api.saveSettings({ paymentQrUrl: r.url }).subscribe((s) => { this.s = s; this.toast.ok('Payment QR updated'); });
     });
   }

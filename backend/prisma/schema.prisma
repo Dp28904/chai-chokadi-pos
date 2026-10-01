@@ -52,7 +52,8 @@ model User {
   role         Role     @default(COUNTER)
   isActive     Boolean  @default(true)
   createdAt    DateTime @default(now())
-  orders       Order[]
+  orders       Order[]  @relation("OrderCreatedBy")
+  servedOrders Order[]  @relation("OrderServedBy")
 }
 
 model Category {
@@ -138,7 +139,7 @@ model Order {
   customerId    Int
   customer      Customer       @relation(fields: [customerId], references: [id])
   createdById   Int
-  createdBy     User           @relation(fields: [createdById], references: [id])
+  createdBy     User           @relation("OrderCreatedBy", fields: [createdById], references: [id])
   subtotal      Int
   discountTotal Int            @default(0)
   grandTotal    Int
@@ -147,11 +148,16 @@ model Order {
   businessDate  DateTime       @db.Date
   createdAt     DateTime       @default(now())
   paidAt        DateTime?
+  // Ticked in Bills once the food is handed over; independent of payment.
+  servedAt      DateTime?
+  servedById    Int?
+  servedBy      User?          @relation("OrderServedBy", fields: [servedById], references: [id])
   lines         OrderLine[]
   offers        OrderOffer[]
 
-  @@index([businessDate])
+  @@index([businessDate, status])
   @@index([status])
+  @@index([customerId])
 }
 
 model OrderLine {
@@ -168,6 +174,8 @@ model OrderLine {
   qty           Int
   lineDiscount  Int     @default(0)
   lineTotal     Int
+
+  @@index([orderId])
 }
 
 model OrderOffer {
@@ -177,6 +185,9 @@ model OrderOffer {
   offerId        Int
   offer          Offer  @relation(fields: [offerId], references: [id])
   discountAmount Int
+
+  @@index([orderId])
+  @@index([offerId])
 }
 
 model StockMovement {
@@ -187,6 +198,8 @@ model StockMovement {
   reason    StockReason
   orderId   Int?
   createdAt DateTime    @default(now())
+
+  @@index([itemId])
 }
 
 model Setting {

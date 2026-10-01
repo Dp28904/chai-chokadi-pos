@@ -6,6 +6,7 @@ import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { JwtStrategy } from './jwt.strategy';
 import { RolesGuard } from './roles';
+import { SessionCache } from './session-cache.service';
 
 @Module({
   imports: [
@@ -15,7 +16,7 @@ import { RolesGuard } from './roles';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy, RolesGuard],
-  exports: [RolesGuard],
+  providers: [AuthService, JwtStrategy, RolesGuard, SessionCache],
+  exports: [RolesGuard, SessionCache],
 })
 export class AuthModule {}

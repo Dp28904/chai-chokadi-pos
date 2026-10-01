@@ -133,7 +133,11 @@ const STEPS: { key: Step[]; label: string }[] = [
               <span class="tick" aria-hidden="true">✓</span>
               <h2>Paid · Bill #{{ order()!.billNo }}</h2>
               <p class="muted"><span class="money">{{ money(order()!.grandTotal) }}</span> · {{ order()!.paymentMethod === 'CASH' ? 'Cash' : 'Online' }} · {{ order()!.customer.name }}</p>
-              <button class="primary lg block" (click)="finished.emit()">New order</button>
+              <div class="done-actions">
+                <button class="green lg" [disabled]="busy()" (click)="servedNow()">✓ Served now</button>
+                <button class="primary lg" (click)="finished.emit()">New order</button>
+              </div>
+              <p class="muted small">Not handed over yet? Tick it in Bills when it's served.</p>
             </div>
           }
         }
@@ -172,7 +176,7 @@ const STEPS: { key: Step[]; label: string }[] = [
     .done { display: grid; justify-items: center; text-align: center; gap: 10px; padding: 8px 0; }
     .tick { width: 72px; height: 72px; border-radius: 999px; background: var(--ok); color: #fff; font-size: 2.4rem; font-weight: 700;
             display: grid; place-items: center; animation: pop .25s ease-out; }
-    .done button { margin-top: 8px; }
+    .done-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%; margin-top: 8px; }
   `],
 })
 export class Checkout implements OnInit {
@@ -255,6 +259,15 @@ export class Checkout implements OnInit {
     this.busy.set(true);
     this.api.payOrder(this.order()!.id, method).subscribe({
       next: (o) => { this.busy.set(false); this.order.set(o); this.step.set('done'); },
+      error: () => this.busy.set(false),
+    });
+  }
+
+  /** For orders handed over straight away at the counter. */
+  servedNow() {
+    this.busy.set(true);
+    this.api.setServed(this.order()!.id, true).subscribe({
+      next: () => { this.busy.set(false); this.finished.emit(); },
       error: () => this.busy.set(false),
     });
   }

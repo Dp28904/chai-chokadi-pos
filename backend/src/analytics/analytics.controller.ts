@@ -1,7 +1,8 @@
 import { Controller, Get, Header, Query, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard, Roles, RolesGuard } from '../auth/roles';
 import { PrismaService } from '../prisma/prisma.service';
-import { aggregate, csvCell, OrderRow } from './aggregate';
+import { csvCell } from './csv';
+import { dashboardSummary } from './analytics.queries';
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -19,14 +20,8 @@ export class AnalyticsController {
   }
 
   @Get('summary')
-  async summary(@Query('from') from?: string, @Query('to') to?: string) {
-    const businessDate = this.range(from, to);
-    const [rows, pending, cancelled] = await Promise.all([
-      this.paidOrders(businessDate),
-      this.prisma.order.count({ where: { status: 'PENDING', businessDate } }),
-      this.prisma.order.count({ where: { status: 'CANCELLED', businessDate } }),
-    ]);
-    return { ...aggregate(rows), pending, cancelled };
+  summary(@Query('from') from?: string, @Query('to') to?: string) {
+    return dashboardSummary(this.prisma, this.range(from, to));
   }
 
   @Get('export.csv')
@@ -41,6 +36,7 @@ export class AnalyticsController {
       'Bill',
       'Business date',
       'Paid at (IST)',
+      'Served at (IST)',
       'Customer',
       'Phone',
       'Items',
@@ -51,13 +47,14 @@ export class AnalyticsController {
       'Payment',
     ];
     const rs = (p: number) => (p / 100).toFixed(2);
+    const ist = (d: Date | null) =>
+      d ? new Date(d.getTime() + 5.5 * 3600_000).toISOString().slice(0, 16).replace('T', ' ') : '';
     const lines = orders.map((o) =>
       [
         o.billNo,
         o.businessDate.toISOString().slice(0, 10),
-        o.paidAt
-          ? new Date(o.paidAt.getTime() + 5.5 * 3600_000).toISOString().slice(0, 16).replace('T', ' ')
-          : '',
+        ist(o.paidAt),
+        ist(o.servedAt),
         o.customer.name,
         o.customer.phone,
         o.lines.map((l) => `${l.qty}x ${l.nameSnapshot}`).join('; '),
@@ -71,39 +68,5 @@ export class AnalyticsController {
         .join(','),
     );
     return [head.join(','), ...lines].join('\n');
-  }
-
-  private async paidOrders(businessDate: { gte?: Date; lte?: Date }): Promise<OrderRow[]> {
-    const orders = await this.prisma.order.findMany({
-      where: { status: 'PAID', businessDate },
-      include: {
-        customer: true,
-        offers: { include: { offer: { select: { name: true } } } },
-        lines: {
-          include: {
-            item: { select: { category: { select: { name: true } } } },
-            combo: { select: { name: true } },
-          },
-        },
-      },
-    });
-    return orders.map((o) => ({
-      businessDate: o.businessDate,
-      paidAt: o.paidAt,
-      createdAt: o.createdAt,
-      grandTotal: o.grandTotal,
-      discountTotal: o.discountTotal,
-      paymentMethod: o.paymentMethod,
-      customer: { id: o.customer.id, name: o.customer.name, phone: o.customer.phone },
-      lines: o.lines.map((l) => ({
-        itemId: l.itemId,
-        comboId: l.comboId,
-        nameSnapshot: l.combo?.name ?? l.nameSnapshot,
-        qty: l.qty,
-        lineTotal: l.lineTotal,
-        categoryName: l.item?.category.name ?? null,
-      })),
-      offers: o.offers.map((x) => ({ discountAmount: x.discountAmount, offerName: x.offer.name })),
-    }));
   }
 }

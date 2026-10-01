@@ -3,6 +3,7 @@ import {
   ArrayMaxSize,
   ArrayMinSize,
   IsArray,
+  IsBoolean,
   IsEnum,
   IsInt,
   IsOptional,
@@ -45,6 +46,10 @@ export class CreateOrderDto extends PreviewDto {
   @IsString()
   @Matches(/^[A-Za-z0-9-]{8,64}$/)
   clientRef?: string;
+}
+
+export class ServedDto {
+  @IsBoolean() served: boolean;
 }
 
 export class PayDto {

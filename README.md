@@ -20,7 +20,7 @@ Payments are not processed by the app. Online payments use your own UPI QR; staf
 | --- | --- |
 | Counter | Home (welcome, ⭐ Chokadi Favourites, numbered combos, offer banners), photo menu by category, search, combos (fixed or "pick any N"), live cart total with offers applied; phones get a bottom nav and a "View cart" button |
 | Checkout | Customer name + mobile (returning customers autofill) → bill → Cash (change calculator) or Online (your QR) |
-| Bills | Any day's bills, pending/paid/cancelled, take payment later or cancel |
+| Bills | Any day's bills; a **To serve** queue with a tick per bill (paid or pending) to confirm it was handed over, who served it and when; take payment later or cancel; refreshes every 20 s so all devices stay in sync |
 | Offers | % off, flat ₹ off, buy X get Y; per item, category or whole bill; min quantity, min bill, "upto ₹" cap, start/end time |
 | Stock | Add / waste / count per item, low-stock alerts, "prepare for tomorrow" forecast from recent sales |
 | Dashboard | Sales per day (cash vs online), busiest hours, top/slow sellers, categories, offer impact, customers, CSV export |
@@ -141,6 +141,8 @@ This keeps both the app and the database warm. Also open the app 10 minutes befo
 ## During the festival
 
 - **Every night**: Dashboard → **Download bills (CSV)**. It's your offline backup.
+- **Serving**: tick each bill in **Bills → To serve** as it's handed over (or tap **Served now** after payment).
+  Served bills can't be cancelled.
 - **Pending bills**: before closing, open **Bills** and settle or cancel anything pending
   (pending bills are not counted in sales).
 - **Prepare for tomorrow**: Stock page, choose Normal / Busy / Peak.
@@ -180,4 +182,23 @@ This uses a separate local database; export CSVs from both if you switch mid-fes
 - Sessions last 16 hours; disabling a user takes effect on their next request.
 - Security headers via Helmet (CSP, HSTS, no framing); request bodies capped at 256 KB.
 - Admin-only endpoints are enforced on the server, not just hidden in the UI.
-- Uploaded images are stored in the database (free hosts have no persistent disk), max 2 MB, PNG/JPEG/WebP only.
+- Uploaded images are stored in the database (free hosts have no persistent disk): PNG/JPEG/WebP up to 8 MB,
+  re-encoded on arrival (photos → ≤720 px WebP, QR → lossless PNG) with metadata such as GPS stripped.
+
+## Performance notes
+
+Measured with 5,250 bills (15 nights × 350) on a laptop, phone emulated at 4× slower CPU on 4G:
+
+| What | Result |
+| --- | --- |
+| Price check while building a cart | ~2 ms, **0 database queries** (menu + offers cached in memory, cleared on any edit) |
+| Create / pay / mark served | 3–5 ms, 7–9 queries (lines inserted in one go; stock updated in one statement) |
+| Bills list (busy night, ~400 bills) | ~19 ms, ~15 KB gzipped, refreshed every 20 s per device |
+| Dashboard, whole festival | ~13 ms (computed in SQL, not in memory) |
+| Counter scrolling / layout shift | 60 fps, CLS 0 (fonts preloaded) |
+
+- Each signed-in request reuses a 60 s account cache instead of re-reading the user; disabling a user clears it at once.
+- Bills renders 50 rows at a time ("Show more"), so a 400-bill night never freezes a phone.
+- Queries slower than 250 ms are logged as warnings (`SLOW_QUERY_MS` to change). `PRISMA_QUERY_LOG=1` logs every query when profiling.
+- Database tests for the dashboard SQL: `npm run test:db` (needs a throwaway database whose name contains "test").
+

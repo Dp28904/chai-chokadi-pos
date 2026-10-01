@@ -49,7 +49,7 @@ const COMBOS = -1;
     <ng-template #card let-p let-n="n">
       <button class="pcard" [class.in-cart]="cart.qtyOf(p.key) > 0" (click)="add(p)">
         <span class="pic">
-          @if (p.imageUrl) { <img [src]="p.imageUrl" alt="" loading="lazy" /> }
+          @if (p.imageUrl) { <img [src]="p.imageUrl" alt="" loading="lazy" decoding="async" /> }
           @if (n) { <span class="num-badge">{{ n }}</span> }
           @if (cart.qtyOf(p.key) > 0) { <span class="count">{{ cart.qtyOf(p.key) }}</span> }
           @if (p.low) { <span class="badge warn corner">Low stock</span> }

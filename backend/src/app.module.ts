@@ -7,6 +7,8 @@ import type { ServerResponse } from 'http';
 import { join } from 'path';
 import { AnalyticsController } from './analytics/analytics.controller';
 import { AuthModule } from './auth/auth.module';
+import { CatalogCache } from './catalog/catalog-cache.service';
+import { InvalidateCatalog } from './catalog/invalidate-catalog.interceptor';
 import { CustomersController } from './customers/customers.controller';
 import { HealthController } from './health/health.controller';
 import { MenuController } from './menu/menu.controller';
@@ -22,6 +24,8 @@ import { UsersController } from './users/users.controller';
 
 // Angular emits content-hashed file names (e.g. chunk-AB12CD34.js): cache forever.
 const HASHED = /-[A-Z0-9]{8}\.(js|css)$/;
+// Self-hosted fonts never change between releases in practice.
+const FONT = /\.woff2$/;
 
 @Module({
   imports: [
@@ -38,7 +42,11 @@ const HASHED = /-[A-Z0-9]{8}\.(js|css)$/;
         setHeaders: (res: ServerResponse, path: string) => {
           res.setHeader(
             'Cache-Control',
-            HASHED.test(path) ? 'public, max-age=31536000, immutable' : 'no-cache',
+            HASHED.test(path)
+              ? 'public, max-age=31536000, immutable'
+              : FONT.test(path)
+                ? 'public, max-age=2592000'
+                : 'no-cache',
           );
         },
       },
@@ -56,6 +64,12 @@ const HASHED = /-[A-Z0-9]{8}\.(js|css)$/;
     StockController,
     AnalyticsController,
   ],
-  providers: [PricingService, OrdersService, { provide: APP_GUARD, useClass: ThrottlerGuard }],
+  providers: [
+    PricingService,
+    OrdersService,
+    CatalogCache,
+    InvalidateCatalog,
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
+  ],
 })
 export class AppModule {}

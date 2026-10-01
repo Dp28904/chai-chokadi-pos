@@ -20,10 +20,11 @@ export class ApiService {
   createCombo(b: Partial<Combo>) { return this.http.post<Combo>('/api/combos', b); }
   updateCombo(id: number, b: Partial<Combo>) { return this.http.put<Combo>(`/api/combos/${id}`, b); }
 
-  upload(file: File) {
+  /** The server shrinks photos to WebP; 'qr' keeps the image lossless so it always scans. */
+  upload(file: File, kind: 'photo' | 'qr' = 'photo') {
     const fd = new FormData();
     fd.append('file', file);
-    return this.http.post<{ id: number; url: string }>('/api/uploads', fd);
+    return this.http.post<{ id: number; url: string }>('/api/uploads', fd, { params: { kind } });
   }
 
   settings() { return this.http.get<Settings>('/api/settings'); }
@@ -37,7 +38,11 @@ export class ApiService {
   }
   payOrder(id: number, method: 'CASH' | 'ONLINE') { return this.http.patch<Order>(`/api/orders/${id}/pay`, { method }); }
   cancelOrder(id: number) { return this.http.patch<Order>(`/api/orders/${id}/cancel`, {}); }
-  orders(date?: string) { return this.http.get<Order[]>('/api/orders', { params: date ? { date } : {} }); }
+  setServed(id: number, served: boolean) { return this.http.patch<Order>(`/api/orders/${id}/served`, { served }); }
+  /** silent: background refreshes shouldn't toast every time the network blips. */
+  orders(date?: string, silent = false) {
+    return this.http.get<Order[]>('/api/orders', { params: date ? { date } : {}, ...(silent ? { context: SILENT() } : {}) });
+  }
   customerByPhone(phone: string) {
     return this.http.get<{ name: string } | null>(`/api/customers/by-phone/${phone}`, { context: SILENT() });
   }

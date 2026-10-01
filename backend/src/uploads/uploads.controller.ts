@@ -6,6 +6,7 @@ import {
   Param,
   ParseIntPipe,
   Post,
+  Query,
   Res,
   UploadedFile,
   UseGuards,
@@ -16,8 +17,11 @@ import { SkipThrottle } from '@nestjs/throttler';
 import type { Response } from 'express';
 import { JwtAuthGuard, Roles, RolesGuard } from '../auth/roles';
 import { PrismaService } from '../prisma/prisma.service';
+import { optimiseImage, UnreadableImageError } from './image';
 
 const ALLOWED = ['image/png', 'image/jpeg', 'image/webp'];
+/** Phone camera photos are often 3-6 MB; they're shrunk on arrival, so accept them. */
+const MAX_UPLOAD_BYTES = 8 * 1024 * 1024;
 
 @Controller('uploads')
 export class UploadsController {
@@ -26,14 +30,17 @@ export class UploadsController {
   @Post()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN')
-  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 2 * 1024 * 1024 } }))
-  async upload(@UploadedFile() file?: Express.Multer.File) {
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: MAX_UPLOAD_BYTES } }))
+  async upload(@UploadedFile() file?: Express.Multer.File, @Query('kind') kind?: string) {
     if (!file) throw new BadRequestException('No file provided');
     if (!ALLOWED.includes(file.mimetype)) {
       throw new BadRequestException('Only PNG, JPEG or WebP images are allowed');
     }
+    const image = await optimiseImage(file.buffer, kind === 'qr' ? 'qr' : 'photo').catch((e: unknown) => {
+      throw e instanceof UnreadableImageError ? new BadRequestException(e.message) : e;
+    });
     const row = await this.prisma.upload.create({
-      data: { mime: file.mimetype, data: new Uint8Array(file.buffer) },
+      data: { mime: image.mime, data: new Uint8Array(image.data) },
     });
     return { id: row.id, url: `/api/uploads/${row.id}` };
   }

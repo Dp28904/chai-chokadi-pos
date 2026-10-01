@@ -1,3 +1,4 @@
+import { InvalidateCatalog } from '../catalog/invalidate-catalog.interceptor';
 import {
   BadRequestException,
   Body,
@@ -10,11 +11,13 @@ import {
   Post,
   Put,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
 import { JwtAuthGuard, Roles, RolesGuard } from '../auth/roles';
 import { PrismaService } from '../prisma/prisma.service';
 import { CategoryDto, ComboDto, ItemDto } from './menu.dto';
 
+@UseInterceptors(InvalidateCatalog)
 @Controller()
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class MenuController {
