@@ -1,0 +1,33 @@
+# Local / offline fallback: runs Postgres + the app on this laptop.
+#   docker compose up -d --build     then open http://<laptop-ip>:3000 on the other devices
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: stall
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-stall}
+      POSTGRES_DB: stall
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U stall"]
+      interval: 5s
+      retries: 10
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://stall:${POSTGRES_PASSWORD:-stall}@db:5432/stall
+      JWT_SECRET: ${JWT_SECRET:-}  # required: the app refuses to start without a strong one
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}  # required on first start (8+ chars)
+    ports:
+      - "3000:3000"
+
+volumes:
+  pgdata:
